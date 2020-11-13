@@ -1,64 +1,91 @@
 class MyPromise {
-    status = 'pending';
-    thenArray = [];
-    catchArray = [];
+    static Status = {
+        Pending: 'pending',
+        Resolved: 'resolved',
+        Rejected: 'rejected',
+    };
+    status = MyPromise.Status.Pending;
+    successCallbacks = [];
+    failureCallbacks = [];
     value;
     error;
 
     constructor(initFunc) {
-        const resolve = (value)=> {
-            this.status = 'resolved';
-            this.value = value;
-            if (this.thenArray.length) {
-                this.executeThenArray();
-            }
-        };
-        const reject = (error)=> {
-            this.status = 'rejected';
-            this.error = error;
-            for (const iterator of this.catchArray) {
-                setTimeout(()=>{
-                    iterator(this.error);
-                }, 100);    
-            }
-        };
-        initFunc(resolve, reject);
+        typeof initFunc === 'function' &&
+            initFunc(this.resolve.bind(this), this.reject.bind(this));
     }
 
-    then(thenFunc) {
-        this.thenArray.push(thenFunc);
-        if (this.status === 'resolved') {
-            this.executeThenArray();
+    resolve(value) {
+        this.status = MyPromise.Status.Resolved;
+        this.value = value;
+        if (this.successCallbacks.length) {
+            this.executeSuccessCallbacks();
         }
     }
-    
-    executeThenArray() {
-        for (const iterator of this.thenArray) {
-            setTimeout(()=>{
-                iterator(this.value);
-            }, 100);    
+
+    reject(error) {
+        this.status = MyPromise.Status.Rejected;
+        this.error = error;
+    }
+
+    then(successCallback, failureCallback) {
+        const myPromise = new MyPromise();
+        this.successCallbacks.push({
+            successCallback,
+            resolve: myPromise.resolve.bind(myPromise),
+        });
+        if (this.status === MyPromise.Status.Resolved) {
+            this.executeSuccessCallbacks();
         }
-        this.thenArray.length = 0;
+        return myPromise;
+    }
+
+    executeSuccessCallbacks() {
+        for (const { successCallback, resolve } of this.successCallbacks) {
+            setTimeout(() => {
+                resolve
+                    ? resolve(successCallback(this.value))
+                    : successCallback(this.value);
+            }, 100);
+        }
     }
 
     catch(catchFunc) {
-        this.catchArray.push(catchFunc);
+        this.failureCallbacks.push(catchFunc);
     }
 
-    static resolve() {
-
+    static resolve(value) {
+        return new MyPromise((resolve, reject) => {
+            resolve(value);
+        });
     }
 
-    static reject() {
-
-    }
+    static reject() {}
 }
 
-var p = new MyPromise((resolve, reject)=>{
+var p = new MyPromise((resolve, reject) => {
     setTimeout(() => {
         resolve(12345);
-    }, 5000);
+    }, 500);
 });
 
-p.then((value)=>console.log(value));
-p.then((value)=>console.log(value));
+p.then((value) => console.log(value));
+p.then((value) => console.log(value));
+p.then((value) => {
+    console.log(value);
+    return 789;
+}).then((v) => {
+    console.log(v);
+});
+
+MyPromise.resolve(1)
+    .then((v) => {
+        console.log(v);
+        return 2;
+    })
+    .then((v) => {
+        console.log(v);
+        return 3;
+    })
+    .then((v) => console.log(v))
+    .then((v) => console.log(v));
