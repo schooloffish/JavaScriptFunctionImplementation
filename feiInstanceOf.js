@@ -1,3 +1,7 @@
+// In JavaScript, a primitive (primitive value, primitive data type) is data that is not an object and has no methods.
+// There are 6 primitive data types: string, number, bigint, boolean, undefined, and symbol.
+// A primitive can be replaced, but it can't be directly altered.
+
 function feiInstanceOf(left, right) {
     const rightType = typeof right;
     if (!['function', 'object'].includes(rightType)) {
@@ -16,6 +20,7 @@ function feiInstanceOf(left, right) {
         'boolean',
         'symbol',
         'bigint',
+        'undefined'
     ].includes(leftType);
     if (isPrimitive) {
         return false;
