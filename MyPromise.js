@@ -1,69 +1,135 @@
-class MyPromise {
+class FeiPromise {
     static Status = {
         Pending: 'pending',
         Resolved: 'resolved',
         Rejected: 'rejected',
     };
-    status = MyPromise.Status.Pending;
-    successCallbacks = [];
-    failureCallbacks = [];
+    status = FeiPromise.Status.Pending;
+    callbacks = [];
+    errorHandlers = [];
     value;
     error;
 
     constructor(initFunc) {
-        typeof initFunc === 'function' &&
-            initFunc(this.resolve.bind(this), this.reject.bind(this));
+        if (typeof initFunc === 'function') {
+            try {
+                initFunc(this.resolve.bind(this), this.reject.bind(this));
+            } catch (error) {
+                this.reject(error);
+            }
+        }
     }
 
     resolve(value) {
-        this.status = MyPromise.Status.Resolved;
+        this.status = FeiPromise.Status.Resolved;
         this.value = value;
-        if (this.successCallbacks.length) {
-            this.executeSuccessCallbacks();
+        if (this.callbacks.length) {
+            this.executeCallbacks();
         }
     }
 
     reject(error) {
-        this.status = MyPromise.Status.Rejected;
+        console.log('reject....');
+        this.status = FeiPromise.Status.Rejected;
         this.error = error;
+        if (this.callbacks.length) {
+            this.executeCallbacks();
+        }
     }
 
     then(successCallback, failureCallback) {
-        const myPromise = new MyPromise();
-        this.successCallbacks.push({
+        const feiPromise = new FeiPromise();
+        this.callbacks.push({
             successCallback,
-            resolve: myPromise.resolve.bind(myPromise),
+            failureCallback,
+            resolve: feiPromise.resolve.bind(feiPromise),
+            reject: feiPromise.reject.bind(feiPromise),
         });
-        if (this.status === MyPromise.Status.Resolved) {
-            this.executeSuccessCallbacks();
+
+        if (this.status !== FeiPromise.Status.Pending) {
+            this.executeCallbacks();
         }
-        return myPromise;
+        return feiPromise;
     }
 
-    executeSuccessCallbacks() {
-        for (const { successCallback, resolve } of this.successCallbacks) {
+    executeCallbacks() {
+        for (const { successCallback, failureCallback, resolve, reject } of this
+            .callbacks) {
             setTimeout(() => {
-                resolve
-                    ? resolve(successCallback(this.value))
-                    : successCallback(this.value);
-            }, 100);
+                try {
+                    if (this.status === FeiPromise.Status.Resolved) {
+                        if (typeof successCallback === 'function') {
+                            try {
+                                resolve(successCallback(this.value));
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    } else {
+                        if (typeof failureCallback === 'function') {
+                            failureCallback(this.error);
+                        }
+                    }
+                } catch (error) {
+                    reject(error);
+                }
+            });
         }
     }
 
-    catch(catchFunc) {
-        this.failureCallbacks.push(catchFunc);
+    catch(errorHandler) {
+        const feiPromise = new FeiPromise();
+
+        this.errorHandlers.push({
+            errorHandler,
+            resolve: feiPromise.resolve.bind(feiPromise),
+        });
+        setTimeout(() => {
+            console.log('catch: ' + this.status);
+            if (this.status === FeiPromise.Status.Rejected) {
+                (this.errorHandlers || []).forEach(
+                    ({ errorHandler, resolve }) => {
+                        resolve(errorHandler(this.error));
+                    }
+                );
+            }
+        });
+
+        return feiPromise;
     }
 
     static resolve(value) {
-        return new MyPromise((resolve, reject) => {
+        return new FeiPromise((resolve, reject) => {
             resolve(value);
         });
     }
 
-    static reject() {}
+    static reject(error) {
+        return new FeiPromise((resolve, reject) => {
+            reject(error);
+        });
+    }
+
+    static race() {}
+
+    static all(promises) {}
 }
 
-var p = new MyPromise((resolve, reject) => {
+var p = new FeiPromise((resolve, reject) => {
+    setTimeout(() => {
+        reject(12345);
+    }, 500);
+});
+p.then(
+    (d) => {
+        console.log('corrected!' + d);
+    },
+    (e) => {
+        console.log('rejected!' + e);
+    }
+);
+
+var p = new FeiPromise((resolve, reject) => {
     setTimeout(() => {
         resolve(12345);
     }, 500);
@@ -78,7 +144,7 @@ p.then((value) => {
     console.log(v);
 });
 
-MyPromise.resolve(1)
+FeiPromise.resolve(1)
     .then((v) => {
         console.log(v);
         return 2;
@@ -89,3 +155,22 @@ MyPromise.resolve(1)
     })
     .then((v) => console.log(v))
     .then((v) => console.log(v));
+
+var p = new FeiPromise((res, rej) => {
+    res('xx');
+})
+    .then(() => {
+        console.log(cccc);
+    })
+    .catch((e) => console.log(e));
+
+var p = new FeiPromise((res, rej) => {
+    rej('xx');
+})
+    .then(
+        () => {},
+        () => {
+            console.log(bbbb);
+        }
+    )
+    .catch((e) => console.log(e));
